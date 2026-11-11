@@ -1,0 +1,80 @@
+version: '3.8'
+
+# ---------------------------------------------------------------------------
+# PATTERN: Infrastructure as Code (IaC) & Network Isolation
+# WHY: Microservices must run in the same isolated network to communicate via 
+# internal DNS (e.g., 'kafka:9092' instead of 'localhost:9092').
+# ---------------------------------------------------------------------------
+networks:
+  banking-network:
+    driver: bridge
+
+services:
+  # -------------------------------------------------------------------------
+  # POSTGRESQL: Relational ACID Database for Account & Transaction state
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: banking-postgres
+    ports:
+      # Maps host port 5432 to container port 5432.
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      # We use one physical DB server, but will logically separate schemas later
+      POSTGRES_DB: banking_simulator
+    networks:
+      - banking-network
+
+  # -------------------------------------------------------------------------
+  # REDIS: In-Memory Data Structure Store
+  # WHY: Used for Idempotency keys. If the Notification service receives the 
+  # same Kafka event twice, it checks Redis. If the key exists, it drops the 
+  # event, preventing duplicate emails.
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: banking-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - banking-network
+
+  # -------------------------------------------------------------------------
+  # KAFKA (KRaft mode): Distributed Event Streaming Platform
+  # WHY: Replaces synchronous HTTP calls with asynchronous events.
+  # If Notification Service is down, Kafka stores the 'TransferInitiated' event.
+  # When Notification Service recovers, it processes the missed event. No data lost.
+  # -------------------------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: banking-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - banking-network
+
+  # -------------------------------------------------------------------------
+  # ZIPKIN: Distributed Tracing System
+  # WHY: In microservices, a single request hits Gateway -> Account -> Kafka -> Notification.
+  # If it fails, where did it fail? Zipkin gives every request a single 'Trace ID'.
+  # -------------------------------------------------------------------------
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: banking-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - banking-network
