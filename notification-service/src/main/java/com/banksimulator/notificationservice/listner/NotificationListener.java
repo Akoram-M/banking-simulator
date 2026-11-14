@@ -1,7 +1,10 @@
 package com.banksimulator.notificationservice.listner;
 
+import java.time.Duration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +15,11 @@ public class NotificationListener {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationListener.class);
 
+    private final StringRedisTemplate redisTemplate;
+
+    public NotificationListener(StringRedisTemplate template){
+        this.redisTemplate = template;
+    }
     /**
      * -----------------------------------------------------------------------
      * PATTERN: Event-Driven Consumer
@@ -22,15 +30,19 @@ public class NotificationListener {
      */
     @KafkaListener(topics = "transactions.events", groupId = "notification-group")
     public void handleTransferEvent(AccountTransferEvent event) {
-        
-        // In the next phase, we will check Redis here using event.id()
-        // to ensure we haven't already processed this event.
-        
+
+        String eventId = event.id().toString();
+
+        // setIfAbsent acts as a distributed lock.
+        // It returns true if the key didn't exist (first time seeing the event).
+        Boolean isNewEvent = redisTemplate.opsForValue().setIfAbsent(eventId, "processed", Duration.ofHours(24));
+
+        if (Boolean.FALSE.equals(isNewEvent)) {
+            log.warn("⚠️ IDEMPOTENCY LOCK: Dropped duplicate event [{}]", eventId);
+            return;
+        }
+
         log.info("🔔 NOTIFICATION: Processed Transfer Event [{}] - Amount: ${} from {} to {}",
-            event.id(), 
-            event.amount(), 
-            event.fromAccount(), 
-            event.toAccount()
-        );
+                eventId, event.amount(), event.fromAccount(), event.toAccount());
     }
 }

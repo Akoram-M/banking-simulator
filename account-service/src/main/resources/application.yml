@@ -21,3 +21,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+      
+springdoc:
+  api-docs:
+    # Custom path for the OpenAPI JSON spec (default is /v3/api-docs)
+    path: • http://localhost:8080/account-service/v3/api-doc
+  swagger-ui:
+    # Custom path for the interactive UI (default is /swagger-ui.html)
+    path: http://localhost:8080/account-service/swagger-ui.html
+    operationsSorter: method

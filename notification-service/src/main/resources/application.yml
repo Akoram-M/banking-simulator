@@ -5,11 +5,16 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      # Identifies this microservice. If you scale to 5 Notification Services, 
-      # Kafka ensures only ONE instance in this group processes each event.
       group-id: notification-group
       auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # 1. Use the ErrorHandlingDeserializer to catch bad messages without crashing
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
+        # 2. Force the consumer to ignore the producer's class path
+        spring.json.use.type.headers: false
+        # 3. Tell the consumer exactly which local class to map the JSON into
+        spring.json.value.default.type: com.banksimulator.notificationservice.dto.AccountTransferEvent
