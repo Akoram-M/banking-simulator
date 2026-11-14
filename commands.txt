@@ -1,0 +1,5 @@
+Check a specific port: lsof -i :<PORT>
+
+Graceful termination: kill -15 <PID>
+
+Forceful termination: kill -9 <PID>

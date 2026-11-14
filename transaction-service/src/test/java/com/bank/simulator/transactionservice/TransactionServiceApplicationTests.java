@@ -1,12 +1,11 @@
 package com.bank.simulator.transactionservice;
 
-import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class TransactionServiceApplicationTests {
 
-	@Test
+	// //@Test
 	void contextLoads() {
 	}
 

@@ -1,0 +1,15 @@
+server:
+  port: 8083 # Prevents port collision with Account Service
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      # Identifies this microservice. If you scale to 5 Notification Services, 
+      # Kafka ensures only ONE instance in this group processes each event.
+      group-id: notification-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
